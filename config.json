@@ -1,9 +1,10 @@
 {
     "LinuxProxy": {
-            "Username": "root",
-            "LocalUsername":"root",
-            "LocalPassword":"password$12"
-        },
+        "Username": "root",
+        "LocalUsername":"root",
+        "LocalPasswordUbuntu":"password$12",
+        "LocalPasswordCentOS":"Veeam1!"
+    },
     "VBRDetails": {
             "Server":"TPM03-VBR01.AperatureLabs.biz",
             "Username":"APLABS\\service.veeam",
