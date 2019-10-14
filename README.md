@@ -25,14 +25,14 @@ There is a master PowerShell script that executes all the code as does the follo
 5. Update the VMware and Linux Template credentials required to communicate to vCenter and modify in config.json
 6. Update the variable values in the 'terraform.tfvars' file under proxy_windows and proxy_linux
 7. Update CentOS and Ubuntu values in the 'maps.tf' file under proxy_linux
-7. Update path in 'pre.bat' and 'post.bat
+8. Update path in 'pre.bat' and 'post.bat
 
 * Veeam Backup & Replication 9.5 Update 4b tested and supported for Windows Proxy Only
 * Veeam Backup & Replication v10 readiness with support for Windows and Linux Proxy
 * Should be run from VBR Server to ensure Console Versions are compatible
 * Require Execution Policy set to Bypass - Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-#### Version 0.9.5.3
+#### Version 0.9.6
 > 0.2 - First pre release for testing 
 
 > 0.4 - Added support for Linux Server to be added and removed to VBR Inventory in preperation for v10 Proxy PowerShell
@@ -45,11 +45,13 @@ There is a master PowerShell script that executes all the code as does the follo
 
 > 0.9.5 - Created new parameters that deploy a CentOS or Ubuntu based Proxy depending on the flag used. All configuration for either distro is contained in Terraform MAP variables declared in the variables.tf file of proxy_linux. This allows for the deployment of Windows, Ubuntu or CentOS based Proxies
 
-> 0.9.5.1 - Seperated MAP veriables out to self contained declaration file for easier editing
+> 0.9.5.1 - Seperated MAP variables out to self contained declaration file for easier editing
 
 > 0.9.5.2 - Added error checking for Proxy Server VBR configuration when adding managed server
 
-> 0.9.5.3 - Added random number element to Proxy VM and Machine Name to allow overlapping instances to be run (allowing for future DHCP support) and not have conflicts.
+> 0.9.5.3 - Added random number element to Proxy VM and Machine Name to allow overlapping instances to be run (allowing for future DHCP support) and not have conflicts
+
+> 0.9.6 - Added ability to calculate Proxy count based on Host Number mainly for HCI deployments. This will look at the number of hosts, set the Proxy count to that and then deploy the Proxies and a vSphere Anti-Affinity rule ensuring all Proxies are started on seperate hosts.
 
 ## Getting Started
 
@@ -59,13 +61,13 @@ Ensure all configuration variables are set as per requirements and as per below.
     PARAMETER Ubuntu - Will deploy Ubuntu Template for Veeam Proxy VMs and configure Veeam Server
     PARAMETER CentOS - Will deploy CentOS Template for Veeam Proxy VMs and configure Veeam Server
     PARAMETER Destroy - Will Destroy configuration from Veeam Server and destroy Proxy VMs in combination with -Windows or -Ubuntu or -CentOS
+    PARAMETER ProxyPerHost - Will set number of Proxyies to number of hosts in vCenter Cluster
 
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows -Destroy
-    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu -Destroy
-    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS -Destroy
+    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS -ProxyPerHost
 
 To Create and Configure Proxies:
 
@@ -87,7 +89,7 @@ or to run from Veeam Backup Job
 
     ./post.bat 
     
-Modification can be made to pre/post script. Requires editing of path relative to loval environment. Example execution for Windows and Linux contained.
+Modification can be made to pre/post script. Requires editing of path relative to loval environment. Example execution for Windows and Linux contained. If you have a HCI configuration you might want to look at -ProxyPerHost as an additional parameter.
     
 ## Configuration
 
