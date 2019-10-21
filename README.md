@@ -32,7 +32,7 @@ There is a master PowerShell script that executes all the code as does the follo
 * Should be run from VBR Server to ensure Console Versions are compatible
 * Require Execution Policy set to Bypass - Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-#### Version 0.9.7
+#### Version 1.0
 > 0.2 - First pre release for testing 
 
 > 0.4 - Added support for Linux Server to be added and removed to VBR Inventory in preperation for v10 Proxy PowerShell
@@ -54,6 +54,8 @@ There is a master PowerShell script that executes all the code as does the follo
 > 0.9.6 - Added ability to calculate Proxy count based on Host Number mainly for HCI deployments. This will look at the number of hosts, set the Proxy count to that and then deploy the Proxies and a vSphere Anti-Affinity rule ensuring all Proxies are started on seperate hosts.
 
 > 0.9.7 - Completed DHCP option for Proxy Deployment. Default remains static IP configuration as dictated by network variables in terraform.tfvars files. Tested with Windows and Ubuntu VM templates.
+
+> 1.0 - Completed support for VBR v10 Linux Proxy Configuration (tested against BETA2)
 
 ## Getting Started
 
@@ -206,7 +208,7 @@ To make Linux deployment more streamlined, there is a seperate maps.tf file from
 
 ## To Do
 
- - [ ] Complete option for Linux Proxy deployment and configuration (waiting for PowerShell commands in v10)
+ - [X] Complete option for Linux Proxy deployment and configuration (waiting for PowerShell commands in v10)
  - [X] Add option to choose DCHP or Static IP Allocation
  - [X] Add ability to scale Proxies outside of pre and post job scripts
  - [X] Add error checking to ensure correct exit conditions

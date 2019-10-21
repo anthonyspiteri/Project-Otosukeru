@@ -3,7 +3,7 @@
 ----------------------------------------------------------------------
 Project Otosukeru - Dynamic Proxy Deployment with Terraform
 ----------------------------------------------------------------------
-Version : 0.9.7
+Version : 1.0
 Requires: Veeam Backup & Replication v9.5 Update 4 or later
 Author  : Anthony Spiteri
 Blog    : https://anthonyspiteri.net
@@ -131,7 +131,7 @@ function WorkOutProxyCount
             }
         if($SetProxies)
             {
-                $VBRProxyCount = $( Read-Host "Enter Number of Proxies to Deploy")
+                $VBRProxyCount = $( Read-Host "Enter Number of Proxies ")
             }
     
         $global:ProxyCount = $VBRProxyCount
@@ -220,6 +220,7 @@ function WindowsProxyBuild
         & .\terraform.exe init
         & .\terraform.exe apply --var "vsphere_proxy_number=$ProxyCount" -auto-approve
         & .\terraform.exe output -json proxy_ip_addresses > ..\proxy_ips.json
+        & .\terraform.exe output -json proxy_vm_names > ..\proxy_vms.json
         Set-Location $wkdir
     }
 
@@ -242,6 +243,7 @@ function LinuxProxyBuild
         & .\terraform.exe init
         & .\terraform.exe apply --var "vpshere_linux_distro=$distro" --var "vsphere_proxy_number=$ProxyCount" -auto-approve
         & .\terraform.exe output -json proxy_ip_addresses > ..\proxy_ips.json
+        & .\terraform.exe output -json proxy_vm_names > ..\proxy_vms.json
         Set-Location $wkdir
     }
 
@@ -275,6 +277,9 @@ function AddVeeamProxy
         $ProxyList = Get-Content proxy_ips.json | ConvertFrom-Json
         $ProxyArray =@($ProxyList)
 
+        $ProxyVMNames = Get-Content proxy_vms.json | ConvertFrom-Json
+        $ProxyVMArray =@($ProxyVMNames)
+
         if(!$ProxyArray)
             {
                 Write-Error -Exception "Exiting due to Terraform Proxy Deployment Issue" -ErrorAction Stop
@@ -298,6 +303,7 @@ function AddVeeamProxy
         for ($i=0; $i -lt $ProxyCount; $i++)
             {
                 $ProxyEntity = $ProxyArray.value[$i]
+                $ProxyVMEntity = $ProxyVMArray.value[$i]
 
                 #Add Proxy to Backup & Replication
                 Write-Host ":: Adding Proxy Server to Backup & Replication" -ForegroundColor Green 
@@ -321,13 +327,14 @@ function AddVeeamProxy
                             }
 
                         Write-Host ":: Creating New Veeam Windows Proxy" -ForegroundColor Green
-                        Add-VBRViProxy -Server $ProxyEntity -MaxTasks 2 -TransportMode HotAdd -ConnectedDatastoreMode Auto -EnableFailoverToNBD | Out-Null
+                        Add-VBRViProxy -Server $ProxyEntity -MaxTasks 4 -TransportMode HotAdd -ConnectedDatastoreMode Auto -EnableFailoverToNBD | Out-Null
                     }
 
                 if ($Ubuntu -or $CentOS)
                     {
-                        #Get and Set Linux Credentials
+                        #Get and Set Linux Credentials and Set ProxyVM from VM Entity List
                         $LinuxCredential = Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"}
+                        $ProxyVM = Find-VBRViEntity -Name $ProxyVMEntity
                         
                         try 
                             {
@@ -342,7 +349,7 @@ function AddVeeamProxy
                             }
 
                         Write-Host ":: Creating New Veeam Linux Proxy" -ForegroundColor Green
-                        #Add-VBRViProxy -Server $ProxyEntity -MaxTasks 2 -TransportMode HotAdd -ConnectedDatastoreMode Auto -EnableFailoverToNBD
+                        Add-VBRViLinuxProxy -Server $ProxyEntity -Description "Dynamic Veeam Proxy" -MaxTasks 4 -ProxyVM $ProxyVM -Force -WarningAction SilentlyContinue | Out-Null
                     }
 
                 Write-Host "--" $ProxyEntity "Configured" -ForegroundColor Yellow -BackgroundColor Black
