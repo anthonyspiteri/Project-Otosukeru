@@ -3,7 +3,7 @@
 ----------------------------------------------------------------------
 Project Otosukeru - Dynamic Proxy Deployment with Terraform
 ----------------------------------------------------------------------
-Version : 0.9.5.3
+Version : 0.9.6
 Requires: Veeam Backup & Replication v9.5 Update 4 or later
 Author  : Anthony Spiteri
 Blog    : https://anthonyspiteri.net
@@ -45,7 +45,11 @@ Known Issues and Limitations:
 
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
-        [Switch]$SetProxies
+        [Switch]$SetProxies,
+
+        [Parameter(Mandatory=$false,
+        ValueFromPipelineByPropertyName=$true)]
+        [Switch]$ProxyPerHost
     )
 
 if (!$Windows -and !$Ubuntu -and !$CentOS -and !$Destroy)
@@ -96,6 +100,7 @@ function ConnectVBRServer
 function WorkOutProxyCount
     {
         $JobObject = Get-VBRJob
+        $Hosts = Get-VBRServer -Type ESXi
             
         try
             {
@@ -110,6 +115,7 @@ function WorkOutProxyCount
 
         $JobObject = Get-VBRJob
         $VMcount = $Objects.count
+        $HostCount = $Hosts.count
 
         if ($VMcount -lt 10)
             {
@@ -123,13 +129,52 @@ function WorkOutProxyCount
             {
                 $VBRProxyCount = 6
             }
-    
+        if ($ProxyPerHost)
+            {
+                $VBRProxyCount = $HostCount
+            }
         if($SetProxies)
             {
                 $VBRProxyCount = $( Read-Host "Enter Number of Proxies to Deploy")
             }
     
         $global:ProxyCount = $VBRProxyCount
+    }
+
+function RenameFileForAntiAffinity
+    {
+        $wkdir = Get-Location
+
+        if($Windows)
+            {
+                Set-Location -Path .\proxy_windows
+            }
+
+        if($Ubuntu -or $CentOS)
+            {
+                Set-Location -Path .\proxy_linux
+            }
+
+        Rename-Item .\anti-affinity_tf -NewName .\anti-affinity.tf
+        Set-Location $wkdir
+    }
+
+function RenameFileBackForAntiAffinity
+    {
+        $wkdir = Get-Location
+
+        if($Windows)
+            {
+                Set-Location -Path .\proxy_windows
+            }
+
+        if($Ubuntu -or $CentOS)
+            {
+                Set-Location -Path .\proxy_linux
+            }
+
+        Rename-Item .\anti-affinity.tf -NewName .\anti-affinity_tf
+        Set-Location $wkdir
     }
 
 function WindowsProxyBuild 
@@ -322,6 +367,11 @@ if ($Windows -and !$Destroy){
     Write-Host "Execution Time" $durationLR -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
 
+    if ($ProxyPerHost)
+        {
+            RenameFileForAntiAffinity 
+        }
+
     $StartTimeTF = Get-Date
     WindowsProxyBuild
     Write-Host ""
@@ -339,6 +389,11 @@ if ($Windows -and !$Destroy){
     $durationTF = [math]::Round((New-TimeSpan -Start $StartTimeTF -End $EndTimeTF).TotalMinutes,2)
     Write-Host "Execution Time" $durationTF -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
+
+    if ($ProxyPerHost)
+        {
+            RenameFileBackForAntiAffinity
+        }
 }
 
 if (($Ubuntu -or $CentOS) -and !$Destroy){
@@ -357,11 +412,16 @@ if (($Ubuntu -or $CentOS) -and !$Destroy){
     $StartTimeLR = Get-Date
     WorkOutProxyCount
     Write-Host ""
-    Write-Host ":: - Getting Job Details and Working out Dynamix Proxy Count - ::" -ForegroundColor Green -BackgroundColor Black
+    Write-Host ":: - Getting Job Details and Working out Dynamic Proxy Count - ::" -ForegroundColor Green -BackgroundColor Black
     $EndTimeLR = Get-Date
     $durationLR = [math]::Round((New-TimeSpan -Start $StartTimeLR -End $EndTimeLR).TotalMinutes,2)
     Write-Host "Execution Time" $durationLR -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
+
+    if ($ProxyPerHost)
+        {
+            RenameFileForAntiAffinity 
+        }
 
     $StartTimeTF = Get-Date
     LinuxProxyBuild
@@ -380,6 +440,11 @@ if (($Ubuntu -or $CentOS) -and !$Destroy){
     $durationTF = [math]::Round((New-TimeSpan -Start $StartTimeTF -End $EndTimeTF).TotalMinutes,2)
     Write-Host "Execution Time" $durationTF -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
+
+    if ($ProxyPerHost)
+        {
+            RenameFileBackForAntiAffinity
+        }
 }
 
 if ($Destroy){
@@ -397,6 +462,12 @@ if ($Destroy){
     
     $StartTimeCL = Get-Date
     WorkOutProxyCount
+
+    if ($ProxyPerHost)
+        {
+            RenameFileForAntiAffinity
+        }
+    
     RemoveVeeamProxy
     Write-Host ""
     Write-Host ":: - Clearing Backup & Replication Server Configuration - ::" -ForegroundColor Green -BackgroundColor Black
@@ -413,6 +484,11 @@ if ($Destroy){
     $durationCL = [math]::Round((New-TimeSpan -Start $StartTimeCL -End $EndTimeCL).TotalMinutes,2)
     Write-Host "Execution Time" $durationCL -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
+
+    if ($ProxyPerHost)
+        {
+            RenameFileBackForAntiAffinity
+        }
 }
 
 Stop-Transcript
