@@ -53,7 +53,7 @@ There is a master PowerShell script that executes all the code as does the follo
 
 > 0.9.6 - Added ability to calculate Proxy count based on Host Number mainly for HCI deployments. This will look at the number of hosts, set the Proxy count to that and then deploy the Proxies and a vSphere Anti-Affinity rule ensuring all Proxies are started on seperate hosts.
 
-> 0.9.7 - PLACEHOLDER
+> 0.9.7 - Completed DHCP option for Proxy Deployment. Default remains static IP configuration as dictated by network variables in terraform.tfvars files. Tested with Windows and Ubuntu VM templates.
 
 ## Getting Started
 
@@ -64,12 +64,14 @@ Ensure all configuration variables are set as per requirements and as per below.
     PARAMETER CentOS - Will deploy CentOS Template for Veeam Proxy VMs and configure Veeam Server
     PARAMETER Destroy - Will Destroy configuration from Veeam Server and destroy Proxy VMs in combination with -Windows or -Ubuntu or -CentOS
     PARAMETER ProxyPerHost - Will set number of Proxyies to number of hosts in vCenter Cluster
+    PARAMETER DHCP - Will use DHCP to configure Veeam Proxy VM networking
 
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows -Destroy
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS -ProxyPerHost
+    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu -DHCP
 
 To Create and Configure Proxies:
 
@@ -91,7 +93,7 @@ or to run from Veeam Backup Job
 
     ./post.bat 
     
-Modification can be made to pre/post script. Requires editing of path relative to loval environment. Example execution for Windows and Linux contained. If you have a HCI configuration you might want to look at -ProxyPerHost as an additional parameter.
+Modification can be made to pre/post script. Requires editing of path relative to local environment. Example execution for Windows and Linux contained. If you have a HCI configuration you might want to look at -ProxyPerHost as an additional parameter. For DHCP configuration you need to add -DHCP as an additional parameter.
     
 ## Configuration
 
@@ -205,7 +207,7 @@ To make Linux deployment more streamlined, there is a seperate maps.tf file from
 ## To Do
 
  - [ ] Complete option for Linux Proxy deployment and configuration (waiting for PowerShell commands in v10)
- - [ ] Add option to choose DCHP or Static IP Allocation
+ - [X] Add option to choose DCHP or Static IP Allocation
  - [X] Add ability to scale Proxies outside of pre and post job scripts
  - [X] Add error checking to ensure correct exit conditions
  - [ ] Add option to not join GuestOS to domain
