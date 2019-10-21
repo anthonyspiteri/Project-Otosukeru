@@ -150,7 +150,7 @@ The following variables can be adjusted dependant on installation vSphere platfo
     vsphere_tag_category ="TPM03"
     vsphere_tag_name ="TPM03-NO-BACKUP"
 
-### VM specifications Windows (proxy_linux)
+### VM specifications Linux (proxy_linux)
 
 The following variables can be adjusted dependant on installation vSphere platform. The ones to look out for that could cause issues is the vm_firmware and vm_tags variables. The vm_firmware need to be noted depending on Windows or Linux configuration.
 
