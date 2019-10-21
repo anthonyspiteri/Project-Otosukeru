@@ -32,7 +32,7 @@ There is a master PowerShell script that executes all the code as does the follo
 * Should be run from VBR Server to ensure Console Versions are compatible
 * Require Execution Policy set to Bypass - Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-#### Version 0.9.6
+#### Version 0.9.7
 > 0.2 - First pre release for testing 
 
 > 0.4 - Added support for Linux Server to be added and removed to VBR Inventory in preperation for v10 Proxy PowerShell
@@ -52,6 +52,8 @@ There is a master PowerShell script that executes all the code as does the follo
 > 0.9.5.3 - Added random number element to Proxy VM and Machine Name to allow overlapping instances to be run (allowing for future DHCP support) and not have conflicts
 
 > 0.9.6 - Added ability to calculate Proxy count based on Host Number mainly for HCI deployments. This will look at the number of hosts, set the Proxy count to that and then deploy the Proxies and a vSphere Anti-Affinity rule ensuring all Proxies are started on seperate hosts.
+
+> 0.9.7 - PLACEHOLDER
 
 ## Getting Started
 

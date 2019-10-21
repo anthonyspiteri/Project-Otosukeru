@@ -3,7 +3,7 @@
 ----------------------------------------------------------------------
 Project Otosukeru - Dynamic Proxy Deployment with Terraform
 ----------------------------------------------------------------------
-Version : 0.9.6
+Version : 0.9.7
 Requires: Veeam Backup & Replication v9.5 Update 4 or later
 Author  : Anthony Spiteri
 Blog    : https://anthonyspiteri.net
@@ -37,10 +37,6 @@ Known Issues and Limitations:
 
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
-        [Switch]$Static,
-
-        [Parameter(Mandatory=$false,
-        ValueFromPipelineByPropertyName=$true)]
         [Switch]$DHCP,
 
         [Parameter(Mandatory=$false,
@@ -56,7 +52,7 @@ if (!$Windows -and !$Ubuntu -and !$CentOS -and !$Destroy)
     {
         Write-Host ""
         Write-Host ":: - ERROR! Script was run without using a parameter..." -ForegroundColor Red -BackgroundColor Black
-        Write-Host ":: - Please use: -Windows, -Ubunut, -Centos or -Destroy" -ForegroundColor Yellow -BackgroundColor Black 
+        Write-Host ":: - Please use: -Windows, -Ubuntu, -Centos or -Destroy" -ForegroundColor Yellow -BackgroundColor Black 
         Write-Host ""
         break
     }
@@ -174,6 +170,44 @@ function RenameFileBackForAntiAffinity
             }
 
         Rename-Item .\anti-affinity.tf -NewName .\anti-affinity_tf
+        Set-Location $wkdir
+    }
+
+function RenameFileForDHCP
+    {
+        $wkdir = Get-Location
+
+        if($Windows)
+            {
+                Set-Location -Path .\proxy_windows
+            }
+
+        if($Ubuntu -or $CentOS)
+            {
+                Set-Location -Path .\proxy_linux
+            }
+
+        Rename-Item .\otosukeru-1.tf -NewName .\otosukeru-1_tf
+        Rename-Item .\otosukeru-1-DHCP_tf -NewName .\otosukeru-1-DHCP.tf
+        Set-Location $wkdir
+    }
+
+function RenameFileBackForDHCP
+    {
+        $wkdir = Get-Location
+
+        if($Windows)
+            {
+                Set-Location -Path .\proxy_windows
+            }
+
+        if($Ubuntu -or $CentOS)
+            {
+                Set-Location -Path .\proxy_linux
+            }
+
+        Rename-Item .\otosukeru-1_tf -NewName .\otosukeru-1.tf
+        Rename-Item .\otosukeru-1-DHCP.tf -NewName .\otosukeru-1-DHCP_tf
         Set-Location $wkdir
     }
 
@@ -372,6 +406,11 @@ if ($Windows -and !$Destroy){
             RenameFileForAntiAffinity 
         }
 
+    if ($DHCP)
+        {
+            RenameFileForDHCP
+        }
+
     $StartTimeTF = Get-Date
     WindowsProxyBuild
     Write-Host ""
@@ -393,6 +432,11 @@ if ($Windows -and !$Destroy){
     if ($ProxyPerHost)
         {
             RenameFileBackForAntiAffinity
+        }
+
+    if ($DHCP)
+        {
+            RenameFileBackForDHCP
         }
 }
 
@@ -423,6 +467,11 @@ if (($Ubuntu -or $CentOS) -and !$Destroy){
             RenameFileForAntiAffinity 
         }
 
+    if ($DHCP)
+        {
+            RenameFileForDHCP
+        }
+
     $StartTimeTF = Get-Date
     LinuxProxyBuild
     Write-Host ""
@@ -444,6 +493,11 @@ if (($Ubuntu -or $CentOS) -and !$Destroy){
     if ($ProxyPerHost)
         {
             RenameFileBackForAntiAffinity
+        }
+
+    if ($DHCP)
+        {
+            RenameFileBackForDHCP
         }
 }
 
@@ -467,6 +521,11 @@ if ($Destroy){
         {
             RenameFileForAntiAffinity
         }
+
+    if ($DHCP)
+        {
+            RenameFileForDHCP
+        }
     
     RemoveVeeamProxy
     Write-Host ""
@@ -488,6 +547,11 @@ if ($Destroy){
     if ($ProxyPerHost)
         {
             RenameFileBackForAntiAffinity
+        }
+
+    if ($DHCP)
+        {
+            RenameFileBackForDHCP
         }
 }
 
