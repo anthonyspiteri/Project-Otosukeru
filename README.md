@@ -9,9 +9,10 @@ There is a master PowerShell script that executes all the code as does the follo
 
 - Connects to a Veeam Backup & Replication Server
 - Gets all Backup Jobs and derives the number of VMs total being backed up
+- Option exists for HCI deployments to set Proxy count to number of hosts
 - Works out how many Veeam Proxies to deploy and sets that as a proxy count value
 - Executes Terraform apply using the proxy count value
-- Terraform deploys Proxies VM to vCenter, configures VM with name and static IP, and adds GustOS to domain
+- Terraform deploys Proxies VM to vCenter, configures VM with name and static IP (DHCP Optional), and adds GustOS to domain
 - PowerShell adds Proxies to Backup & Replication
 - PowerShell then removes Proxies from Backup & Replication
 - Destroys the Proxy VMs with Terraform
@@ -107,7 +108,7 @@ All of the variables are configured in the config.json file. Nothing is required
 		    "Username": "root",
 		    "LocalUsername":"root",
 		    "LocalPasswordUbuntu":"password$12"
-            "LocalPasswordCentOS":"password$12"
+             "LocalPasswordCentOS":"password$12"
 		},
     
     "VBRDetails": {
