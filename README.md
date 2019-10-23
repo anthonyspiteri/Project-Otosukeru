@@ -216,3 +216,4 @@ To make Linux deployment more streamlined, there is a seperate maps.tf file from
  - [ ] Add option to not join GuestOS to domain
  - [ ] Fix compatability issues with Terraform 0.12.x - main issue is JSON output not being correct format for PowerShell import
  - [ ] Improve basic Proxy sizing logic
+ - [ ] Create new feature to scale Proxies up or down once initial deployment has been completed
