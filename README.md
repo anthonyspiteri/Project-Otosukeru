@@ -217,3 +217,15 @@ To make Linux deployment more streamlined, there is a seperate maps.tf file from
  - [ ] Fix compatability issues with Terraform 0.12.x - main issue is JSON output not being correct format for PowerShell import
  - [ ] Improve basic Proxy sizing logic
  - [ ] Create new feature to scale Proxies up or down once initial deployment has been completed
+
+ ## ✍ Contributions
+
+We welcome contributions from the community! We encourage you to create [issues](https://github.com/VeeamHub/veeam-proxy-autodeploy/issues/new/choose) for Bugs & Feature Requests and submit Pull Requests. For more detailed information, refer to our [Contributing Guide](CONTRIBUTING.md).
+
+## 🤝🏾 License
+
+* [MIT License](LICENSE)
+
+## 🤔 Questions
+
+If you have any questions or something is unclear, please don't hesitate to [create an issue](https://github.com/VeeamHub/veeam-proxy-autodeploy/issues/new/choose) and let us know!
