@@ -1,4 +1,4 @@
-﻿# Project Ōtosukēru 
+﻿# Veeam Proxy Auto Deploy (Project Ōtosukēru)  
 
 ![enter image description here](https://sociorocketnewsen.files.wordpress.com/2017/12/gp-41.png)
 
