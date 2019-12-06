@@ -3,7 +3,7 @@
 ----------------------------------------------------------------------
 Project Otosukeru - Dynamic Proxy Deployment with Terraform
 ----------------------------------------------------------------------
-Version     : 1.0
+Version     : 1.1
 Requires    : Veeam Backup & Replication v9.5 Update 4 or later
 Supported   : Veeam Backup & Replication v10 BETA 2
 Author      : Anthony Spiteri
@@ -42,11 +42,15 @@ Known Issues and Limitations:
 
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
-        [Switch]$SetProxies,
+        [int]$SetProxies,
 
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
-        [Switch]$ProxyPerHost
+        [Switch]$ProxyPerHost,
+
+        [Parameter(Mandatory=$false,
+        ValueFromPipelineByPropertyName=$true)]
+        [Switch]$NASProxy
     )
 
 if (!$Windows -and !$Ubuntu -and !$CentOS -and !$Destroy)
@@ -96,11 +100,9 @@ function ConnectVBRServer
 
 function WorkOutProxyCount
     {
-        $JobObject = Get-VBRJob
-        $Hosts = Get-VBRServer -Type ESXi
-            
         try
             {
+                $JobObject = Get-VBRJob
                 $Objects = $JobObject.GetObjectsInJob()
             }
         catch 
@@ -112,9 +114,12 @@ function WorkOutProxyCount
 
         $JobObject = Get-VBRJob
         $VMcount = $Objects.count
+
+        #Get ESXi Host Count
+        $Hosts = Get-VBRServer -Type ESXi
         $HostCount = $Hosts.count
 
-        if ($VMcount -lt 10)
+        if($VMcount -lt 10)
             {
                 $VBRProxyCount = 2  
             }
@@ -126,16 +131,32 @@ function WorkOutProxyCount
             {
                 $VBRProxyCount = 6
             }
-        if ($ProxyPerHost)
+        if($ProxyPerHost)
             {
                 $VBRProxyCount = $HostCount
             }
         if($SetProxies)
             {
-                $VBRProxyCount = $( Read-Host "Enter Number of Proxies ")
+                $VBRProxyCount = $SetProxies
             }
-    
+ 
         $global:ProxyCount = $VBRProxyCount
+    }
+
+function WorkOutIfScaleDown
+    {
+        $ProxyList = Get-Content proxy_ips.json | ConvertFrom-Json
+        $ProxyArray =@($ProxyList)
+
+        if($ProxyCount -lt $ProxyList.Value.Count) 
+            {
+                $ScaleDownValue = $True 
+            } 
+        else 
+            { 
+                $ScaleDownValue = $False 
+            }
+        $global:ScaleDown = $ScaleDownValue
     }
 
 function RenameFileForAntiAffinity
@@ -280,23 +301,26 @@ function AddVeeamProxy
 
         $ProxyVMNames = Get-Content proxy_vms.json | ConvertFrom-Json
         $ProxyVMArray =@($ProxyVMNames)
-
+    
         if(!$ProxyArray)
             {
                 Write-Error -Exception "Exiting due to Terraform Proxy Deployment Issue" -ErrorAction Stop
             }
 
-        if ($Windows) 
+        $ExistingWinCredential = Get-VBRCredentials -Name $config.VBRDetails.Username
+        $ExistingLinuxCredential = Get-VBRCredentials | Where-Object {$_.Description -eq "Proxy Linux Admin"}
+
+        if($Windows -and !$ExistingWinCredential) 
             {
                 Add-VBRCredentials -Type Windows -User $config.VBRDetails.Username -Password $config.VBRDetails.Password -Description "Windows Domain Admin" | Out-Null
             }
 
-        if ($Ubuntu)
+        if($Ubuntu -and !$ExistingLinuxCredential)
             {
                 Add-VBRCredentials -Type Linux -User $config.LinuxProxy.LocalUsername -Password $config.LinuxProxy.LocalPasswordUbuntu -ElevateToRoot -Description "Proxy Linux Admin"  | Out-Null
             }
 
-        if ($CentOS)
+        if($CentOS -and !$ExistingLinuxCredential)
             {
                 Add-VBRCredentials -Type Linux -User $config.LinuxProxy.LocalUsername -Password $config.LinuxProxy.LocalPasswordCentOS -ElevateToRoot -Description "Proxy Linux Admin"  | Out-Null
             }
@@ -305,16 +329,25 @@ function AddVeeamProxy
             {
                 $ProxyEntity = $ProxyArray.value[$i]
                 $ProxyVMEntity = $ProxyVMArray.value[$i]
+                $ProxyName = $ProxyArray.value[$i]
+
+                #Return True or False if Proxy Exists in VBR
+                $ProxyExists = Get-VBRViProxy | Where-Object {$_.Name -eq $ProxyName}
 
                 #Add Proxy to Backup & Replication
-                Write-Host ":: Adding Proxy Server to Backup & Replication" -ForegroundColor Green 
+                Write-Host ":: Adding Proxy Server to Backup & Replication" -ForegroundColor Yellow 
 
-                if ($Windows)
+                if($Windows)
                     {
                         #Get and Set Windows Credential
-                        $WindowsCredential = Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username} 
+                        if(!$ProxyExists)
+                            {
+                                $WindowsCredential = Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username}
+                            } 
 
                         #Add Windows Server to VBR and Configure Proxy
+                        if(!$ProxyExists)
+                        {
                         try 
                             {
                                 Add-VBRWinServer -Name $ProxyEntity -Description "Dynamic Veeam Proxy" -Credentials $WindowsCredential -ErrorAction Stop | Out-Null
@@ -327,16 +360,23 @@ function AddVeeamProxy
                                 Write-Error -Exception "Exiting due to issues adding Windows Proxy to Veeam Server" -ErrorAction Stop
                             }
 
-                        Write-Host ":: Creating New Veeam Windows Proxy" -ForegroundColor Green
+                        Write-Host ":: Creating New Veeam Windows Proxy" -ForegroundColor Yellow
                         Add-VBRViProxy -Server $ProxyEntity -MaxTasks 4 -TransportMode HotAdd -ConnectedDatastoreMode Auto -EnableFailoverToNBD | Out-Null
+                        }
                     }
 
                 if ($Ubuntu -or $CentOS)
                     {
                         #Get and Set Linux Credentials and Set ProxyVM from VM Entity List
-                        $LinuxCredential = Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"}
+                        if(!$ProxyExists)
+                            {
+                                $LinuxCredential = Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"}
+                            }
+
                         $ProxyVM = Find-VBRViEntity -Name $ProxyVMEntity
                         
+                        if(!$ProxyExists)
+                        {
                         try 
                             {
                                 Add-VBRLinux -Name $ProxyEntity -Description "Dynamic Veeam Proxy" -Credentials $LinuxCredential -WarningAction SilentlyContinue -ErrorAction Stop | Out-Null
@@ -349,30 +389,122 @@ function AddVeeamProxy
                                 Write-Error -Exception "Exiting due to issues adding Linux Proxy to Veeam Server" -ErrorAction Stop
                             }
 
-                        Write-Host ":: Creating New Veeam Linux Proxy" -ForegroundColor Green
-                        Add-VBRViLinuxProxy -Server $ProxyEntity -Description "Dynamic Veeam Proxy" -MaxTasks 4 -ProxyVM $ProxyVM -Force -WarningAction SilentlyContinue | Out-Null
+                        Write-Host ":: Creating New Veeam Linux Proxy" -ForegroundColor Yellow
+                        }
+
+                        if(!$ProxyExists)
+                        {
+                        try 
+                            {
+                                Add-VBRViLinuxProxy -Server $ProxyEntity -Description "Dynamic Veeam Proxy" -MaxTasks 4 -ProxyVM $ProxyVM -Force -WarningAction SilentlyContinue -ErrorAction Stop | Out-Null
+                            }
+                        catch 
+                            {
+                                Write-Host -ForegroundColor Red "ERROR: $_" -ErrorAction Stop
+		                        Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                                Stop-Transcript
+                                Write-Error -Exception "Exiting due to issues Configuring Linux Proxy" -ErrorAction Stop 
+                            }
+                        }
                     }
 
-                Write-Host "--" $ProxyEntity "Configured" -ForegroundColor Yellow -BackgroundColor Black
+                if ($ProxyExists) {Write-Host "--" $ProxyEntity "Exists in Configurtion" -ForegroundColor Green} else {Write-Host "--" $ProxyEntity "Configured" -ForegroundColor Green}
                 Write-Host
             }
     }
 
-function RemoveVeeamProxy
+    function AddVeeamNASProxy
+    {
+        $host.ui.RawUI.WindowTitle = "Adding Veeam NAS File Proxies"
+        
+        $ProxyList = Get-Content proxy_ips.json | ConvertFrom-Json
+        $ProxyArray =@($ProxyList)
+ 
+        if(!$ProxyArray)
+            {
+                Write-Error -Exception "Exiting due to Terraform Proxy Deployment Issue" -ErrorAction Stop
+            }
+
+        $ExistingWinCredential = Get-VBRCredentials -Name $config.VBRDetails.Username
+
+        if($Windows -and !$ExistingWinCredential) 
+            {
+                Add-VBRCredentials -Type Windows -User $config.VBRDetails.Username -Password $config.VBRDetails.Password -Description "Windows Domain Admin" | Out-Null
+            }
+
+        for ($i=0; $i -lt $ProxyCount; $i++)
+            {
+                $ProxyEntity = $ProxyArray.value[$i]
+                $ProxyName = $ProxyArray.value[$i]
+
+                #Return True or False if Proxy Exists in VBR
+                $NASProxyExists = Get-VBRNASProxyServer -Name $ProxyName
+
+                #Add Proxy to Backup & Replication
+                Write-Host ":: Adding NAS File Proxy Server to Backup & Replication" -ForegroundColor Yellow 
+
+                if($Windows)
+                    {
+                        #Get and Set Windows Credential
+                        if(!$NASProxyExists)
+                            {
+                                $WindowsCredential = Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username}
+                            } 
+
+                        #Add Windows Server to VBR and Configure Proxy
+                        if(!$NASProxyExists)
+                        {
+                        try 
+                            {
+                                Add-VBRWinServer -Name $ProxyEntity -Description "Dynamic Veeam NAS File Proxy" -Credentials $WindowsCredential -ErrorAction Stop | Out-Null
+                            }
+                        Catch 
+                            {
+                                Write-Host -ForegroundColor Red "ERROR: $_" -ErrorAction Stop
+		                        Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                                Stop-Transcript
+                                Write-Error -Exception "Exiting due to issues adding NAS File Proxy to Veeam Server" -ErrorAction Stop
+                            }
+
+                        Write-Host ":: Creating New Veeam NAS File Proxy" -ForegroundColor Yellow
+                        Add-VBRNASProxyServer -Server $ProxyEntity -ConcurrentTaskNumber 2 | Out-Null
+                        }
+                    }
+
+                if ($NASProxyExists) {Write-Host "--" $ProxyEntity "Exists in Configurtion" -ForegroundColor Green} else {Write-Host "--" $ProxyEntity "Configured" -ForegroundColor Green}
+                Write-Host
+            }
+    }
+
+    function RemoveVeeamProxy
     {
         $host.ui.RawUI.WindowTitle = "Removing Veeam Proxies"
-        
+
         $ProxyList = Get-Content proxy_ips.json | ConvertFrom-Json
         $ProxyArray =@($ProxyList)
         
         for ($i=0; $i -lt $ProxyCount; $i++)
             {
                 $ProxyEntity = $ProxyArray.value[$i]
+                $ProxyName = $ProxyArray.value[$i]
+
+                #Return True or False if Proxy Exists in VBR
+                $ProxyExists = Get-VBRViProxy | Where-Object {$_.Name -eq $ProxyName}
+                $NASProxyExists = Get-VBRNASProxyServer -Name $ProxyName
+
 
                 #Remove Proxy From Backup & Replication
-                Write-Host ":: Removing Proxy Server from Backup & Replication" -ForegroundColor Green
+                if (!$NASProxy -and $ProxyExists)
+                    {
+                        Write-Host ":: Removing Proxy Server from Backup & Replication" -ForegroundColor Yellow
+                        Get-VBRViProxy -Name $ProxyEntity | Remove-VBRViProxy -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                    }
 
-                Get-VBRViProxy -Name $ProxyEntity | Remove-VBRViProxy -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                if ($NASProxy -and $NASProxyExists)
+                    {
+                        Write-Host ":: Removing NAS File Proxy from Backup & Replication" -ForegroundColor Yellow
+                        Get-VBRNASProxyServer -Name $ProxyEntity | Remove-VBRNASProxyServer -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                    }
 
                 Get-VBRServer -Type Windows -Name $ProxyEntity | Remove-VBRServer -Confirm:$false -WarningAction SilentlyContinue | Out-Null
                 Get-VBRServer -Type Linux -Name $ProxyEntity | Remove-VBRServer -Confirm:$false -WarningAction SilentlyContinue | Out-Null
@@ -381,34 +513,77 @@ function RemoveVeeamProxy
                 Write-Host
             }
 
-            Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
-            Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+            if($Windows) { Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null }
+            if($Ubuntu -or $CentOS) { Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null }
+    }
+
+function ScaleDownVeeamProxy
+    {
+        $host.ui.RawUI.WindowTitle = "Scaling Down Veeam Proxies"
+
+        $ProxyList = Get-Content proxy_ips.json | ConvertFrom-Json
+        $ProxyArray =@($ProxyList)
+
+        #Reverse Proxy Array to make sure we are removing oldest Proxy to match Terraform
+        [array]::Reverse($ProxyList.Value)
+
+        #Set Iterations of For Loop
+        $ProxyArrayFinish = ($ProxyArray.Value.Count - $ProxyCount)
+        
+        for ($i=0; $i -lt $ProxyArrayFinish; $i++)
+            {
+                $ProxyEntity = $ProxyList.value[$i]
+                $ProxyName = $ProxyList.value[$i]
+
+                #Return True or False if Proxy Exists in VBR
+                $ProxyExists = Get-VBRViProxy | Where-Object {$_.Name -eq $ProxyName}
+                $NASProxyExists = Get-VBRNASProxyServer -Name $ProxyName
+
+                #Remove Proxy From Backup & Replication
+                if (!$NASProxy -and $ProxyExists)
+                    {
+                        Write-Host ":: Removing Proxy Server from Backup & Replication" -ForegroundColor Yellow
+                        Get-VBRViProxy -Name $ProxyEntity | Remove-VBRViProxy -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                    }
+
+                if ($NASProxy -and $NASProxyExists)
+                    {
+                        Write-Host ":: Removing NAS File Proxy from Backup & Replication" -ForegroundColor Yellow
+                        Get-VBRNASProxyServer -Name $ProxyEntity | Remove-VBRNASProxyServer -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                    }
+                Get-VBRServer -Type Windows -Name $ProxyEntity | Remove-VBRServer -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+                Get-VBRServer -Type Linux -Name $ProxyEntity | Remove-VBRServer -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+
+                Write-Host "--" $ProxyEntity "Removed" -ForegroundColor Red -BackgroundColor Black
+                Write-Host
+            }
     }
 
 #Execute Functions
+Start-Transcript logs\ProjectOtosukeru-Log.txt -Force
 
-if ($Windows -and !$Destroy){
+$StartTimeVB = Get-Date
+ConnectVBRServer
+Write-Host ""
+Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
+$EndTimeVB = Get-Date
+$durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
+Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
+Write-Host ""
+
+$StartTimeLR = Get-Date
+Write-Host ""
+Write-Host ":: - Getting Job Details and Working out Dynamix Proxy Count - ::" -ForegroundColor Green -BackgroundColor Black
+WorkOutProxyCount
+WorkOutIfScaleDown
+$EndTimeLR = Get-Date
+$durationLR = [math]::Round((New-TimeSpan -Start $StartTimeLR -End $EndTimeLR).TotalMinutes,2)
+Write-Host "Execution Time" $durationLR -ForegroundColor Green -BackgroundColor Black
+Write-Host ""
+
+if ($Windows -and !$Destroy -and !$ScaleDown){
     #Run the code for Windows Proxies
-    Start-Transcript logs\ProjectOtosukeru-Log.txt -Force
-
-    $StartTimeVB = Get-Date
-    ConnectVBRServer
-    Write-Host ""
-    Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeVB = Get-Date
-    $durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
-    Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
     
-    $StartTimeLR = Get-Date
-    WorkOutProxyCount
-    Write-Host ""
-    Write-Host ":: - Getting Job Details and Working out Dynamix Proxy Count - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeLR = Get-Date
-    $durationLR = [math]::Round((New-TimeSpan -Start $StartTimeLR -End $EndTimeLR).TotalMinutes,2)
-    Write-Host "Execution Time" $durationLR -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
-
     if ($ProxyPerHost)
         {
             RenameFileForAntiAffinity 
@@ -422,20 +597,35 @@ if ($Windows -and !$Destroy){
     $StartTimeTF = Get-Date
     WindowsProxyBuild
     Write-Host ""
-    Write-Host ":: - Windows Proxies Deployed via Terraform - ::" -ForegroundColor Green -BackgroundColor Black
+    Write-Host ":: - Windows Proxy VMs Deployed via Terraform - ::" -ForegroundColor Green -BackgroundColor Black
     $EndTimeTF = Get-Date
     $durationTF = [math]::Round((New-TimeSpan -Start $StartTimeTF -End $EndTimeTF).TotalMinutes,2)
     Write-Host "Execution Time" $durationTF -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
 
-    $StartTimeTF = Get-Date
-    AddVeeamProxy
-    Write-Host ""
-    Write-Host ":: - Windows Proxies Configured - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeTF = Get-Date
-    $durationTF = [math]::Round((New-TimeSpan -Start $StartTimeTF -End $EndTimeTF).TotalMinutes,2)
-    Write-Host "Execution Time" $durationTF -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
+    if (!$NASProxy)
+        {
+            $StartTimeTF = Get-Date
+            AddVeeamProxy
+            Write-Host ""
+            Write-Host ":: - Windows Proxies Configured - ::" -ForegroundColor Green -BackgroundColor Black
+            $EndTimeTF = Get-Date
+            $durationTF = [math]::Round((New-TimeSpan -Start $StartTimeTF -End $EndTimeTF).TotalMinutes,2)
+            Write-Host "Execution Time" $durationTF -ForegroundColor Green -BackgroundColor Black
+            Write-Host ""
+        }
+
+    if ($NASProxy)
+        {
+            $StartTimeTF = Get-Date
+            AddVeeamNASProxy
+            Write-Host ""
+            Write-Host ":: - NAS File Proxies Configured - ::" -ForegroundColor Green -BackgroundColor Black
+            $EndTimeTF = Get-Date
+            $durationTF = [math]::Round((New-TimeSpan -Start $StartTimeTF -End $EndTimeTF).TotalMinutes,2)
+            Write-Host "Execution Time" $durationTF -ForegroundColor Green -BackgroundColor Black
+            Write-Host ""
+        }
 
     if ($ProxyPerHost)
         {
@@ -448,28 +638,9 @@ if ($Windows -and !$Destroy){
         }
 }
 
-if (($Ubuntu -or $CentOS) -and !$Destroy){
+if (($Ubuntu -or $CentOS) -and !$Destroy -and !$ScaleDown){
     #Run the code for Linux Proxies
-    Start-Transcript logs\ProjectOtosukeru-Log.txt -Force
-
-    $StartTimeVB = Get-Date
-    ConnectVBRServer
-    Write-Host ""
-    Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeVB = Get-Date
-    $durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
-    Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
-    
-    $StartTimeLR = Get-Date
-    WorkOutProxyCount
-    Write-Host ""
-    Write-Host ":: - Getting Job Details and Working out Dynamic Proxy Count - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeLR = Get-Date
-    $durationLR = [math]::Round((New-TimeSpan -Start $StartTimeLR -End $EndTimeLR).TotalMinutes,2)
-    Write-Host "Execution Time" $durationLR -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
-
+ 
     if ($ProxyPerHost)
         {
             RenameFileForAntiAffinity 
@@ -509,22 +680,10 @@ if (($Ubuntu -or $CentOS) -and !$Destroy){
         }
 }
 
-if ($Destroy){
-    #Run the code to Remove Proxies
-    Start-Transcript logs\ProjectOtosukeru-Log.txt -Append
-    
-    $StartTimeVB = Get-Date
-    ConnectVBRServer
-    Write-Host ""
-    Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeVB = Get-Date
-    $durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
-    Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
-    
+if ($Destroy -and !$ScaleDown){
+    #Run the code to Remove Proxies 
     $StartTimeCL = Get-Date
-    WorkOutProxyCount
-
+    
     if ($ProxyPerHost)
         {
             RenameFileForAntiAffinity
@@ -547,6 +706,58 @@ if ($Destroy){
     ProxyDestroy
     Write-Host ""
     Write-Host ":: - Destroying Proxies with Terraform - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeCL = Get-Date
+    $durationCL = [math]::Round((New-TimeSpan -Start $StartTimeCL -End $EndTimeCL).TotalMinutes,2)
+    Write-Host "Execution Time" $durationCL -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+
+    if ($ProxyPerHost)
+        {
+            RenameFileBackForAntiAffinity
+        }
+
+    if ($DHCP)
+        {
+            RenameFileBackForDHCP
+        }
+}
+
+if ($ScaleDown){
+    #Run the code to Scale Down Proxies
+    $StartTimeCL = Get-Date
+
+    if ($ProxyPerHost)
+        {
+            RenameFileForAntiAffinity
+        }
+
+    if ($DHCP)
+        {
+            RenameFileForDHCP
+        }
+    
+    Write-Host ""
+    Write-Host ":: - Scaling Down Proxies from Backup & Replication Server Configuration - ::" -ForegroundColor Green -BackgroundColor Black
+    ScaleDownVeeamProxy
+    $EndTimeCL = Get-Date
+    $durationCL = [math]::Round((New-TimeSpan -Start $StartTimeCL -End $EndTimeCL).TotalMinutes,2)
+    Write-Host "Execution Time" $durationCL -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+
+    $StartTimeCL = Get-Date
+    Write-Host ""
+    Write-Host ":: - Scaling Down Proxies with Terraform - ::" -ForegroundColor Green -BackgroundColor Black
+    
+    if($Windows)
+        {
+            WindowsProxyBuild
+        }
+
+    if($Ubuntu -or $CentOS)
+        {
+            LinuxProxyBuild
+        } 
+
     $EndTimeCL = Get-Date
     $durationCL = [math]::Round((New-TimeSpan -Start $StartTimeCL -End $EndTimeCL).TotalMinutes,2)
     Write-Host "Execution Time" $durationCL -ForegroundColor Green -BackgroundColor Black
