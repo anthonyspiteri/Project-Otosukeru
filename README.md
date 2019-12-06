@@ -71,12 +71,14 @@ Ensure all configuration variables are set as per requirements and as per below.
     PARAMETER Windows - Will deploy Windows Template for Veeam Proxy VMs and configure Veeam Server
     PARAMETER Ubuntu - Will deploy Ubuntu Template for Veeam Proxy VMs and configure Veeam Server
     PARAMETER CentOS - Will deploy CentOS Template for Veeam Proxy VMs and configure Veeam Server
+    PARAMETER NASProxy - Will deploy Windows Template for Veeam NAS File Proxy and configure Veeam Server
     PARAMETER SetProxies - Required value after switch. Value will determine number of proxies deployed or how to scale up and down
     PARAMETER Destroy - Will Destroy configuration from Veeam Server and destroy Proxy VMs in combination with -Windows or -Ubuntu or -CentOS
     PARAMETER ProxyPerHost - Will set number of Proxyies to number of hosts in vCenter Cluster
     PARAMETER DHCP - Will use DHCP to configure Veeam Proxy VM networking
 
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows
+    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows -NASProxy
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu -SetProxies 3
@@ -90,6 +92,21 @@ To Create and Configure Proxies:
     ./deploy_otosukeru.ps1 -Windows
     ./deploy_otosukeru.ps1 -Ubuntu
     ./deploy_otosukeru.ps1 -CentOS
+
+To Create and Configure NAS File Proxies:
+
+    ./deploy_otosukeru.ps1 -Windows -NASProxy
+
+To Create and Configure Proxies and set the count:
+
+    ./deploy_otosukeru.ps1 -Windows -SetProxies 2
+
+To Scale up or down existing Proxies configured with -SetProxies flag
+
+    INITIAL:    ./deploy_otosukeru.ps1 -Windows -SetProxies 2
+    SCALE UP:   ./deploy_otosukeru.ps1 -Windows -SetProxies 5
+    SCALE DOWN: ./deploy_otosukeru.ps1 -Windows -SetProxies 3
+    DESTROY:    ./deploy_otosukeru.ps1 -Windows -SetProxies 3 -Destroy
 
 or to run from Veeam Backup Job
 
