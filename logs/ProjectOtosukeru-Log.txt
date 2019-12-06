@@ -1,1 +1,56 @@
-﻿
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20191206073608
+Username: APLABS\service.veeam
+RunAs User: APLABS\service.veeam
+Machine: TPM03-VB1-V10B2 (Microsoft Windows NT 10.0.14393.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 7460
+PSVersion: 5.1.14393.0
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.14393.0
+BuildVersion: 10.0.14393.0
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is logs\ProjectOtosukeru-Log.txt
+
+:: - Connected to Backup & Replication Server - ::
+Execution Time 0.02
+
+
+:: - Getting Job Details and Working out Dynamix Proxy Count - ::
+Execution Time 0
+
+
+
+
+:: - Windows Proxies Deployed via Terraform - ::
+Execution Time 2.53
+
+:: Adding Proxy Server to Backup & Replication
+:: Creating New Veeam Linux Proxy
+-- 10.0.30.210 Configured
+
+:: Adding Proxy Server to Backup & Replication
+:: Creating New Veeam Linux Proxy
+-- 10.0.30.211 Configured
+
+:: Adding Proxy Server to Backup & Replication
+:: Creating New Veeam Linux Proxy
+-- 10.0.30.212 Configured
+
+:: Adding Proxy Server to Backup & Replication
+:: Creating New Veeam Linux Proxy
+-- 10.0.30.213 Configured
+
+
+:: - Windows Proxies Configured - ::
+Execution Time 2.88
+
+**********************
+Windows PowerShell transcript end
+End time: 20191206074134
+**********************

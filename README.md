@@ -1,4 +1,4 @@
-﻿# Veeam Proxy Auto Deploy (Project Ōtosukēru)  
+﻿# Veeam Proxy Auto Deploy (Project Ōtosukēru) 
 
 ![enter image description here](https://sociorocketnewsen.files.wordpress.com/2017/12/gp-41.png)
 
@@ -58,6 +58,12 @@ There is a master PowerShell script that executes all the code as does the follo
 
 > 1.0 - Completed support for VBR v10 Linux Proxy Configuration (tested against BETA2)
 
+> 1.1 - Improved Veeam Credential creation logic to not add duplicate entries
+      - Changed -SetProxyCount parameter behaviour so that Proxy number is set when calling PowerShell script
+      - Added logic to work out if Proxies are being scaled up or scaled down
+      - Added Function to Scale Down Proxies and enhanced Add Proxy functions to cater for added functionality
+      - Added ability to deploy and configure new NAS File Proxies (v10 Ready and tested against BETA2)
+
 ## Getting Started
 
 Ensure all configuration variables are set as per requirements and as per below.
@@ -65,6 +71,7 @@ Ensure all configuration variables are set as per requirements and as per below.
     PARAMETER Windows - Will deploy Windows Template for Veeam Proxy VMs and configure Veeam Server
     PARAMETER Ubuntu - Will deploy Ubuntu Template for Veeam Proxy VMs and configure Veeam Server
     PARAMETER CentOS - Will deploy CentOS Template for Veeam Proxy VMs and configure Veeam Server
+    PARAMETER SetProxies - Required value after switch. Value will determine number of proxies deployed or how to scale up and down
     PARAMETER Destroy - Will Destroy configuration from Veeam Server and destroy Proxy VMs in combination with -Windows or -Ubuntu or -CentOS
     PARAMETER ProxyPerHost - Will set number of Proxyies to number of hosts in vCenter Cluster
     PARAMETER DHCP - Will use DHCP to configure Veeam Proxy VM networking
@@ -72,6 +79,8 @@ Ensure all configuration variables are set as per requirements and as per below.
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS
+    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu -SetProxies 3
+    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu -SetProxies 3 -Destroy
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows -Destroy
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS -ProxyPerHost
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu -DHCP

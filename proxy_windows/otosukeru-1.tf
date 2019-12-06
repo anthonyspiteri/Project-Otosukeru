@@ -54,5 +54,5 @@ resource "vsphere_virtual_machine" "VBR-PROXY" {
       ipv4_gateway      = "${var.vsphere_ipv4_gateway}"
       dns_server_list   = ["${var.vsphere_dns_server1}", "${var.vsphere_dns_server2}"]
     }
-  } 
+  }
 }
