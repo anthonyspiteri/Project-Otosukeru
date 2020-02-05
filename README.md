@@ -3,7 +3,9 @@
 ![enter image description here](https://sociorocketnewsen.files.wordpress.com/2017/12/gp-41.png)
 
 ## Description
-The aim of this project, is to have Veeam Proxies automtically deployed and configured for ephemeral use by Veeam Backup & Replication jobs. It has the ability to deploy Veeam Backup Proxy VMs to vSphere and configures them in Veeam Backup & Replication and also the ability to remove the configuration and destory the VMs. A pre and post script can be configured within the Veeam Job and run everytime the job is executed.
+The aim of this project, is to have Veeam Proxies automtically deployed and configured for ephemeral use by Veeam Backup & Replication jobs. It has the ability to deploy Veeam Backup Proxy VMs to vSphere and configures them in Veeam Backup & Replication and also the ability to remove the configuration and destory the VMs. A pre and post script can be configured within the Veeam Job and run everytime the job is executed. 
+
+It can also be used to deploy any number of Veeam Proxies automatically and then scale up or down the number based on a parameter flag.
 
 There is a master PowerShell script that executes all the code as does the following:
 
@@ -19,7 +21,7 @@ There is a master PowerShell script that executes all the code as does the follo
 
 ## Requirements
 
-1. Download [Terraform](https://releases.hashicorp.com/terraform/0.11.7/) (tested version 0.11.7 - 0.12.x will not work) binary to your workstation. Ensure it's set in [system environmental variables](https://learn.hashicorp.com/terraform/getting-started/install.html)
+1. Download [Terraform](https://releases.hashicorp.com/terraform/0.11.7/) (tested version 0.11.7 - 0.12.x is not tested) binary to your workstation. Ensure it's set in [system environmental variables](https://learn.hashicorp.com/terraform/getting-started/install.html)
 2. Terraform vSphere Provider called from 'main.tf'
 3. Pre configured Windows (2019 Server Core Preferred ) or Linux (Ubuntu 18.04 LTS Preferred with CentOS 7 also tested) Template accessible from vCenter
 4. For Linux Template, Firewall must be enabled otherwise Terraform deployment will fail
@@ -29,7 +31,7 @@ There is a master PowerShell script that executes all the code as does the follo
 8. Update path in 'pre.bat' and 'post.bat
 
 * Veeam Backup & Replication 9.5 Update 4b tested and supported for Windows Proxy Only
-* Veeam Backup & Replication v10 readiness with support for Windows and Linux Proxy
+* Veeam Backup & Replication v10 RTM tested and supported for Windows, Linux and NAS File Proxy
 * Should be run from VBR Server to ensure Console Versions are compatible
 * Require Execution Policy set to Bypass - Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
@@ -63,6 +65,9 @@ There is a master PowerShell script that executes all the code as does the follo
       - Added logic to work out if Proxies are being scaled up or scaled down
       - Added Function to Scale Down Proxies and enhanced Add Proxy functions to cater for added functionality
       - Added ability to deploy and configure new NAS File Proxies (v10 Ready and tested against BETA2)
+
+> 1.1.1 - Removed some redundant Terraform variables
+        - Tested against v10 RTM
 
 ## Getting Started
 
