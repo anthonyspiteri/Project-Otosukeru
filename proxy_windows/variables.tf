@@ -100,10 +100,6 @@ variable "vsphere_dns_server2" {
   default     = "1.1.1.1"
 }
 
-variable "vsphere_domain" {
-  description = "What is the domain of the VM"
-}
-
 variable "vsphere_time_zone" {
   description = "What is the timezone of the VM (default: UTC)"
   default     = "UTC"
