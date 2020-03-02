@@ -43,7 +43,7 @@ There is a master PowerShell script that executes all the code as does the follo
 - Bug on first run where Scale Down might take affect. Rerun with same commands to workaround.
 - Minimum number of proxies to deploy is 2. Deploying 1 will result in failure.
 
-#### Version 1.0
+#### Version 1.2
 > 0.2 - First pre release for testing 
 
 > 0.4 - Added support for Linux Server to be added and removed to VBR Inventory in preperation for v10 Proxy PowerShell
