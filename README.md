@@ -37,6 +37,12 @@ There is a master PowerShell script that executes all the code as does the follo
 * Should be run from VBR Server to ensure Console Versions are compatible
 * Require Execution Policy set to Bypass - Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
+## Known Issues and Limitations:
+- vSphere API timeouts can happen during apply/destroy phase of Terraform. See Log file to troubleshoot.
+- Speed of Proxy deployment depends on underlying infrastructure as well as VM Template. (Testing has shown 5 Windows Proxies can be deployed in 5 minutes)
+- Bug on first run where Scale Down might take affect. Rerun with same commands to workaround.
+- Minimum number of proxies to deploy is 2. Deploying 1 will result in failure.
+
 #### Version 1.0
 > 0.2 - First pre release for testing 
 
