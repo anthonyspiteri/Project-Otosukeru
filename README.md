@@ -1,18 +1,21 @@
-﻿# Veeam Proxy Auto Deploy (Project Ōtosukēru) 
+# Veeam Proxy Auto Deploy (Project Ōtosukēru)
 
-![enter image description here](https://sociorocketnewsen.files.wordpress.com/2017/12/gp-41.png)
+![Project Ōtosukēru](https://sociorocketnewsen.files.wordpress.com/2017/12/gp-41.png)
 
 ## Description
-The aim of this project, is to have Veeam Proxies automtically deployed and configured for ephemeral use by Veeam Backup & Replication jobs. It has the ability to deploy Veeam Backup Proxy VMs to vSphere and configures them in Veeam Backup & Replication and also the ability to remove the configuration and destory the VMs. A pre and post script can be configured within the Veeam Job and run everytime the job is executed. 
 
-It can also be used to deploy any number of Veeam Proxies automatically and then scale up or down the number based on a parameter flag.
+The initial aim of this project was to have Veeam Proxies automtically deployed and configured for ephemeral use by Veeam Backup & Replication jobs. It has the ability to deploy Veeam Backup Proxy VMs to vSphere and configures them in Veeam Backup & Replication and also the ability to remove the configuration and destroy the VMs. A pre and post script can be configured within the Veeam Job and run everytime the job is executed.
 
-There is a master PowerShell script that executes all the code as does the following:
+As the scope of the project grew, the focus shifted to the ability to deploy Veeam Proxies automatically, but then have the ability to scale the number up or down dynamically. It also has the ability to deploy and scale new NAS File Proxies.
+
+There is a master PowerShell script that executes all the code and does the following:
 
 - Connects to a Veeam Backup & Replication Server
 - Gets all Backup Jobs and derives the number of VMs total being backed up
 - Option exists for HCI deployments to set Proxy count to number of hosts
+- Option exists to set number of proxies when executing script
 - Works out how many Veeam Proxies to deploy and sets that as a proxy count value
+- Works out if set proxy count means a scale up or scale down
 - Executes Terraform apply using the proxy count value
 - Terraform deploys Proxies VM to vCenter, configures VM with name and static IP (DHCP Optional), and adds GustOS to domain
 - PowerShell adds Proxies to Backup & Replication
@@ -21,7 +24,7 @@ There is a master PowerShell script that executes all the code as does the follo
 
 ## Requirements
 
-1. Download [Terraform](https://releases.hashicorp.com/terraform/0.11.7/) (tested version 0.11.7 - 0.12.x is not tested) binary to your workstation. Ensure it's set in [system environmental variables](https://learn.hashicorp.com/terraform/getting-started/install.html)
+1. Download [Terraform](https://releases.hashicorp.com/terraform/0.11.7/) (tested version 0.11.7 - 0.12.x will not work) binary to your workstation. Ensure it's set in [system environmental variables](https://learn.hashicorp.com/terraform/getting-started/install.html)
 2. Terraform vSphere Provider called from 'main.tf'
 3. Pre configured Windows (2019 Server Core Preferred ) or Linux (Ubuntu 18.04 LTS Preferred with CentOS 7 also tested) Template accessible from vCenter
 4. For Linux Template, Firewall must be enabled otherwise Terraform deployment will fail
@@ -30,18 +33,26 @@ There is a master PowerShell script that executes all the code as does the follo
 7. Update CentOS and Ubuntu values in the 'maps.tf' file under proxy_linux
 8. Update path in 'pre.bat' and 'post.bat
 
-* Veeam Backup & Replication 9.5 Update 4b tested and supported for Windows Proxy Only
-* Veeam Backup & Replication v10 RTM tested and supported for Windows, Linux and NAS File Proxy
-* Should be run from VBR Server to ensure Console Versions are compatible
-* Require Execution Policy set to Bypass - Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+- Veeam Backup & Replication 9.5 Update 4b tested and supported for Windows Proxy Only
+- Veeam Backup & Replication v10 tested with support for Windows and Linux Proxy
+- Should be run from VBR Server to ensure Console Versions are compatible
+- Require Execution Policy set to Bypass - `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 
-#### Version 1.0
-> 0.2 - First pre release for testing 
+## Known Issues and Limitations
+
+- vSphere API timeouts can happen during apply/destroy phase of Terraform. See Log file to troubleshoot.
+- Speed of Proxy deployment depends on underlying infrastructure as well as VM Template. (Testing has shown 5 Windows Proxies can be deployed in 5 minutes)
+- Bug on first run where Scale Down might take affect. Rerun with same commands to workaround.
+- Minimum number of proxies to deploy is 2. Deploying 1 will result in failure.
+
+### Version 1.2
+
+> 0.2 - First pre release for testing
 
 > 0.4 - Added support for Linux Server to be added and removed to VBR Inventory in preperation for v10 Proxy PowerShell
       - Added Error Checking on VBR Connection that will exist if not sucessfull on conneciton
 
-> 0.9 - Added support for Ubuntu or CentOS (Ubuntu default now in variable examples) 
+> 0.9 - Added support for Ubuntu or CentOS (Ubuntu default now in variable examples)
       - Added remote-exec Terraform entry to add port 2500 to Linux FW in readiness for v10
       - Added error checking for VBR connectivity, Job VM Count and Terraform deployment issues
       - Added experimental support for -SetProxyCount parameter
@@ -66,8 +77,10 @@ There is a master PowerShell script that executes all the code as does the follo
       - Added Function to Scale Down Proxies and enhanced Add Proxy functions to cater for added functionality
       - Added ability to deploy and configure new NAS File Proxies (v10 Ready and tested against BETA2)
 
-> 1.1.1 - Removed some redundant Terraform variables
-        - Tested against v10 RTM
+> 1.2 - Added ability to deploy and configure Windows Proxies on Workgroups
+      - Confirmed compatability with Backup & Replication v10 GA
+      - Fixed code warnings and formatting
+      - General enhancements
 
 ## Getting Started
 
@@ -81,9 +94,11 @@ Ensure all configuration variables are set as per requirements and as per below.
     PARAMETER Destroy - Will Destroy configuration from Veeam Server and destroy Proxy VMs in combination with -Windows or -Ubuntu or -CentOS
     PARAMETER ProxyPerHost - Will set number of Proxyies to number of hosts in vCenter Cluster
     PARAMETER DHCP - Will use DHCP to configure Veeam Proxy VM networking
+    PARAMETER WORKGROUP - Will deploy Windows Template on a Workgroup for Veeam Proxy VMs
 
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows -NASProxy
+    EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Windows -Wrokgroup
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -CentOS
     EXAMPLE - PS C:\>deploy_otosukeru.ps1 -Ubuntu -SetProxies 3
@@ -106,6 +121,10 @@ To Create and Configure Proxies and set the count:
 
     ./deploy_otosukeru.ps1 -Windows -SetProxies 2
 
+To Create and Configure Proxies on a Windows Workgroup:
+
+    ./deploy_otosukeru.ps1 -Windows -Workgroup
+
 To Scale up or down existing Proxies configured with -SetProxies flag
 
     INITIAL:    ./deploy_otosukeru.ps1 -Windows -SetProxies 2
@@ -126,31 +145,35 @@ To Destroy and Destroy Proxies:
 or to run from Veeam Backup Job
 
     ./post.bat 
-    
+
 Modification can be made to pre/post script. Requires editing of path relative to local environment. Example execution for Windows and Linux contained. If you have a HCI configuration you might want to look at -ProxyPerHost as an additional parameter. For DHCP configuration you need to add -DHCP as an additional parameter.
-    
+
 ## Configuration
 
 ## config.json Breakdown
-All of the variables are configured in the config.json file. Nothing is required to be changed in the main depply script.
+
+All of the variables are configured in the config.json file. Nothing is required to be changed in the main deploy script. The autodeploy user is created with the first.ps1 script used for Windows Workgroup deployments.
 
     {
     "LinuxProxy": {
-		    "Username": "root",
-		    "LocalUsername":"root",
-		    "LocalPasswordUbuntu":"password$12"
-             "LocalPasswordCentOS":"password$12"
-		},
+            "Username": "root",
+            "LocalUsername":"root",
+            "LocalPasswordUbuntu":"password$12"
+            "LocalPasswordCentOS":"password$12"
+        },
     
     "VBRDetails": {
-		    "Server":"TPM03-VBR01.AperatureLabs.biz",
-		    "Username":"APLABS\\service.veeam",
-		    "Password":"password$12"
-	    }
+            "Server":"TPM03-VBR01.AperatureLabs.biz",
+            "Username":"APLABS\\service.veeam",
+            "Password":"password$12",
+            "Username2":"autodeploy",
+            "Password2":"Veeam1!"
+        }
     }
 
 ## terraform.tfvars Breakdown
-All variables are configured in the terraform.tfvars file and passed through to the TF configuration files. There is one config file for Windows and Linux Proxy deployment. Each contained in the repective folders. 
+
+All variables are configured in the terraform.tfvars file and passed through to the TF configuration files. There is one config file for Windows and Linux Proxy deployment. Each contained in the repective folders.
 
 ### vCenter connection
 
@@ -207,7 +230,7 @@ The following variables can be adjusted dependant on installation vSphere platfo
     vsphere_tag_category ="TPM03"
     vsphere_tag_name ="TPM03-NO-BACKUP"
 
-### Proxy Configuration 
+### Proxy Configuration
 
 The varibales below dictate the number of nodes (if run outside of PowerShell Proxy Logic), the first three octects of the IP Subnet and then the starting host address of proxies. The names and IP addresses of Proxies are incremented based on the number of Proxies being deployed. The Linux Distro variable is used as a default (if run outside of PowerShell Proxy Logic) but is setup through the -CentOS or Ubuntu parameter
 
@@ -216,8 +239,9 @@ The varibales below dictate the number of nodes (if run outside of PowerShell Pr
     vsphere_ipv4_address_proxy_network = "10.0.30."
     vsphere_ipv4_address_proxy_host ="210"
 
-## maps.tf Breakdown (proxy_linux)
-To make Linux deployment more streamlined, there is a seperate maps.tf file from which to set specific distro variables. The MAPs are then used depending on the vsphere_linux_distro variable that is set in 'terraform.tfvars' (if run outside of PowerShell) or set at the time of Terraform apply. Example below is for Ubuntu and CentOS and sets remote_exec command for FW rules 2500, the template location and the template password.
+## `maps.tf` Breakdown (proxy_linux)
+
+To make Linux deployment more streamlined, there is a seperate `maps.tf` file from which to set specific distro variables. The MAPs are then used depending on the vsphere_linux_distro variable that is set in 'terraform.tfvars' (if run outside of PowerShell) or set at the time of Terraform apply. Example below is for Ubuntu and CentOS and sets remote_exec command for FW rules 2500, the template location and the template password.
 
     variable "remote_exec" {
         default = {
@@ -240,22 +264,22 @@ To make Linux deployment more streamlined, there is a seperate maps.tf file from
 
 ## To Do
 
- - [X] Complete option for Linux Proxy deployment and configuration (waiting for PowerShell commands in v10)
- - [X] Add option to choose DCHP or Static IP Allocation
- - [X] Add ability to scale Proxies outside of pre and post job scripts
- - [X] Add error checking to ensure correct exit conditions
- - [ ] Add option to not join GuestOS to domain
- - [ ] Fix compatability issues with Terraform 0.12.x - main issue is JSON output not being correct format for PowerShell import
- - [ ] Improve basic Proxy sizing logic
- - [ ] Create new feature to scale Proxies up or down once initial deployment has been completed
+- [X] Complete option for Linux Proxy deployment and configuration (waiting for PowerShell commands in v10)
+- [X] Add option to choose DCHP or Static IP Allocation
+- [X] Add ability to scale Proxies outside of pre and post job scripts
+- [X] Add error checking to ensure correct exit conditions
+- [X] Add option to not join GuestOS to domain
+- [ ] Fix compatability issues with Terraform 0.12.x - main issue is JSON output not being correct format for PowerShell import
+- [ ] Improve basic Proxy sizing logic
+- [X] Create new feature to scale Proxies up or down once initial deployment has been completed
 
- ## ✍ Contributions
+## ✍ Contributions
 
 We welcome contributions from the community! We encourage you to create [issues](https://github.com/VeeamHub/veeam-proxy-autodeploy/issues/new/choose) for Bugs & Feature Requests and submit Pull Requests. For more detailed information, refer to our [Contributing Guide](CONTRIBUTING.md).
 
 ## 🤝🏾 License
 
-* [MIT License](LICENSE)
+- [MIT License](LICENSE)
 
 ## 🤔 Questions
 

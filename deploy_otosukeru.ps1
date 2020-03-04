@@ -3,7 +3,7 @@
 ----------------------------------------------------------------------
 Project Otosukeru - Dynamic Proxy Deployment with Terraform
 ----------------------------------------------------------------------
-Version     : 1.1
+Version     : 1.2
 Requires    : Veeam Backup & Replication v9.5 Update 4 or later
 Supported   : Veeam Backup & Replication v10 BETA 2
 Author      : Anthony Spiteri
@@ -14,6 +14,7 @@ GitHub      : https://www.github.com/anthonyspiteri
 Known Issues and Limitations:
 - vSphere API timeouts can happen during apply/destroy phase of Terraform. See Log file to troubleshoot.
 - Speed of Proxy deployment depends on underlying infrastructure as well as VM Template. (Testing has shown 5 Windows Proxies can be deployed in 5 minutes)
+- Bug on first run where Scale Down might take affect. Rerun with same commands to workaround.
 #>
 
 [CmdletBinding()]
@@ -50,7 +51,11 @@ Known Issues and Limitations:
 
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
-        [Switch]$NASProxy
+        [Switch]$NASProxy,
+
+        [Parameter(Mandatory=$false,
+        ValueFromPipelineByPropertyName=$true)]
+        [Switch]$Workgroup
     )
 
 if (!$Windows -and !$Ubuntu -and !$CentOS -and !$Destroy)
@@ -233,6 +238,34 @@ function RenameFileBackForDHCP
         Set-Location $wkdir
     }
 
+    function RenameFileForWorkGroup
+    {
+        $wkdir = Get-Location
+
+        if($Windows)
+            {
+                Set-Location -Path .\proxy_windows
+            }
+
+        Rename-Item .\otosukeru-1.tf -NewName .\otosukeru-1_tf
+        Rename-Item .\otosukeru-1-NoAD_tf -NewName .\otosukeru-1-NoAD.tf
+        Set-Location $wkdir
+    }
+
+function RenameFileBackForWorkGroup
+    {
+        $wkdir = Get-Location
+
+        if($Windows)
+            {
+                Set-Location -Path .\proxy_windows
+            }
+
+        Rename-Item .\otosukeru-1_tf -NewName .\otosukeru-1.tf
+        Rename-Item .\otosukeru-1-NoAD.tf -NewName .\otosukeru-1-NoAD_tf
+        Set-Location $wkdir
+    }
+
 function WindowsProxyBuild 
     {
         $host.ui.RawUI.WindowTitle = "Deploying Windows Proxies with Terraform"
@@ -307,12 +340,26 @@ function AddVeeamProxy
                 Write-Error -Exception "Exiting due to Terraform Proxy Deployment Issue" -ErrorAction Stop
             }
 
-        $ExistingWinCredential = Get-VBRCredentials -Name $config.VBRDetails.Username
+        if(!$Workgroup)
+            {
+                $WindowsUsername = $config.VBRDetails.Username
+                $WindowsPassword = $config.VBRDetails.Password
+                $WindowsDescription = "Windows Domain Account"
+            }
+        
+        if($Workgroup)
+            {
+                $WindowsUsername = $config.VBRDetails.Username2
+                $WindowsPassword = $config.VBRDetails.Password2
+                $WindowsDescription = "Windows Server Account"
+            }
+
+        $ExistingWinCredential = Get-VBRCredentials -Name $WindowsUsername
         $ExistingLinuxCredential = Get-VBRCredentials | Where-Object {$_.Description -eq "Proxy Linux Admin"}
 
         if($Windows -and !$ExistingWinCredential) 
             {
-                Add-VBRCredentials -Type Windows -User $config.VBRDetails.Username -Password $config.VBRDetails.Password -Description "Windows Domain Admin" | Out-Null
+                Add-VBRCredentials -Type Windows -User $WindowsUsername -Password $WindowsPassword -Description $WindowsDescription | Out-Null
             }
 
         if($Ubuntu -and !$ExistingLinuxCredential)
@@ -342,7 +389,7 @@ function AddVeeamProxy
                         #Get and Set Windows Credential
                         if(!$ProxyExists)
                             {
-                                $WindowsCredential = Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username}
+                                $WindowsCredential = Get-VBRCredentials | where-object {$_.Description -eq $WindowsDescription}
                             } 
 
                         #Add Windows Server to VBR and Configure Proxy
@@ -355,7 +402,7 @@ function AddVeeamProxy
                         Catch 
                             {
                                 Write-Host -ForegroundColor Red "ERROR: $_" -ErrorAction Stop
-		                        Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+		                        Get-VBRCredentials | where-object {$_.Description -eq $WindowsDescription} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
                                 Stop-Transcript
                                 Write-Error -Exception "Exiting due to issues adding Windows Proxy to Veeam Server" -ErrorAction Stop
                             }
@@ -370,7 +417,7 @@ function AddVeeamProxy
                         #Get and Set Linux Credentials and Set ProxyVM from VM Entity List
                         if(!$ProxyExists)
                             {
-                                $LinuxCredential = Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"}
+                                $LinuxCredential = Get-VBRCredentials | where-object {$_.Description -eq "Proxy Linux Admin"}
                             }
 
                         $ProxyVM = Find-VBRViEntity -Name $ProxyVMEntity
@@ -384,7 +431,7 @@ function AddVeeamProxy
                         catch 
                             {
                                 Write-Host -ForegroundColor Red "ERROR: $_" -ErrorAction Stop
-		                        Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+		                        Get-VBRCredentials | where-object {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
                                 Stop-Transcript
                                 Write-Error -Exception "Exiting due to issues adding Linux Proxy to Veeam Server" -ErrorAction Stop
                             }
@@ -401,7 +448,7 @@ function AddVeeamProxy
                         catch 
                             {
                                 Write-Host -ForegroundColor Red "ERROR: $_" -ErrorAction Stop
-		                        Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+		                        Get-VBRCredentials | where-object {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
                                 Stop-Transcript
                                 Write-Error -Exception "Exiting due to issues Configuring Linux Proxy" -ErrorAction Stop 
                             }
@@ -425,11 +472,25 @@ function AddVeeamProxy
                 Write-Error -Exception "Exiting due to Terraform Proxy Deployment Issue" -ErrorAction Stop
             }
 
-        $ExistingWinCredential = Get-VBRCredentials -Name $config.VBRDetails.Username
+        if(!$Workgroup)
+            {
+                $WindowsUsername = $config.VBRDetails.Username
+                $WindowsPassword = $config.VBRDetails.Password
+                $WindowsDescription = "Windows Domain Account"
+            }
+        
+        if($Workgroup)
+            {
+                $WindowsUsername = $config.VBRDetails.Username2
+                $WindowsPassword = $config.VBRDetails.Password2
+                $WindowsDescription = "Windows Server Account"
+            }
+        
+            $ExistingWinCredential = Get-VBRCredentials -Name $WindowsUsername
 
         if($Windows -and !$ExistingWinCredential) 
             {
-                Add-VBRCredentials -Type Windows -User $config.VBRDetails.Username -Password $config.VBRDetails.Password -Description "Windows Domain Admin" | Out-Null
+                Add-VBRCredentials -Type Windows -User $WindowsUsername -Password $WindowsPassword -Description $WindowsDescription | Out-Null
             }
 
         for ($i=0; $i -lt $ProxyCount; $i++)
@@ -448,7 +509,7 @@ function AddVeeamProxy
                         #Get and Set Windows Credential
                         if(!$NASProxyExists)
                             {
-                                $WindowsCredential = Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username}
+                                $WindowsCredential = Get-VBRCredentials | where-object {$_.Description -eq $WindowsDescription}
                             } 
 
                         #Add Windows Server to VBR and Configure Proxy
@@ -461,7 +522,7 @@ function AddVeeamProxy
                         Catch 
                             {
                                 Write-Host -ForegroundColor Red "ERROR: $_" -ErrorAction Stop
-		                        Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+		                        Get-VBRCredentials | where-object {$_.Description -eq $WindowsDescription} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null
                                 Stop-Transcript
                                 Write-Error -Exception "Exiting due to issues adding NAS File Proxy to Veeam Server" -ErrorAction Stop
                             }
@@ -489,9 +550,20 @@ function AddVeeamProxy
                 $ProxyName = $ProxyArray.value[$i]
 
                 #Return True or False if Proxy Exists in VBR
-                $ProxyExists = Get-VBRViProxy | Where-Object {$_.Name -eq $ProxyName}
+                $ProxyExists = Get-VBRViProxy | Where-object {$_.Name -eq $ProxyName}
                 $NASProxyExists = Get-VBRNASProxyServer -Name $ProxyName
 
+                if(!$Workgroup)
+                {
+                    $WindowsUsername = $config.VBRDetails.Username
+                    $WindowsDescription = "Windows Domain Account"
+                }
+            
+                if($Workgroup)
+                {
+                    $WindowsUsername = $config.VBRDetails.Username2
+                    $WindowsDescription = "Windows Server Account"
+                }
 
                 #Remove Proxy From Backup & Replication
                 if (!$NASProxy -and $ProxyExists)
@@ -513,8 +585,8 @@ function AddVeeamProxy
                 Write-Host
             }
 
-            if($Windows) { Get-VBRCredentials | where {$_.Name -eq $config.VBRDetails.Username} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null }
-            if($Ubuntu -or $CentOS) { Get-VBRCredentials | where {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null }
+            if($Windows) { Get-VBRCredentials | where-object {$_.Description -eq $WindowsDescription} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null }
+            if($Ubuntu -or $CentOS) { Get-VBRCredentials | where-object {$_.Description -eq "Proxy Linux Admin"} | Remove-VBRCredentials -Confirm:$false -WarningAction SilentlyContinue | Out-Null }
     }
 
 function ScaleDownVeeamProxy
@@ -594,6 +666,11 @@ if ($Windows -and !$Destroy -and !$ScaleDown){
             RenameFileForDHCP
         }
 
+    if ($Workgroup)
+        {
+            RenameFileForWorkGroup
+        }  
+
     $StartTimeTF = Get-Date
     WindowsProxyBuild
     Write-Host ""
@@ -636,6 +713,11 @@ if ($Windows -and !$Destroy -and !$ScaleDown){
         {
             RenameFileBackForDHCP
         }
+
+    if ($Workgroup)
+        {
+            RenameFileBackForWorkGroup
+        } 
 }
 
 if (($Ubuntu -or $CentOS) -and !$Destroy -and !$ScaleDown){
@@ -650,6 +732,11 @@ if (($Ubuntu -or $CentOS) -and !$Destroy -and !$ScaleDown){
         {
             RenameFileForDHCP
         }
+
+    if ($Workgroup)
+        {
+            RenameFileForWorkGroup
+        }  
 
     $StartTimeTF = Get-Date
     LinuxProxyBuild
@@ -678,6 +765,11 @@ if (($Ubuntu -or $CentOS) -and !$Destroy -and !$ScaleDown){
         {
             RenameFileBackForDHCP
         }
+
+    if ($Workgroup)
+        {
+            RenameFileBackForWorkGroup
+        } 
 }
 
 if ($Destroy -and !$ScaleDown){
@@ -686,13 +778,18 @@ if ($Destroy -and !$ScaleDown){
     
     if ($ProxyPerHost)
         {
-            RenameFileForAntiAffinity
+            RenameFileForAntiAffinity 
         }
 
     if ($DHCP)
         {
             RenameFileForDHCP
         }
+
+    if ($Workgroup)
+        {
+            RenameFileForWorkGroup
+        }  
     
     RemoveVeeamProxy
     Write-Host ""
@@ -720,6 +817,11 @@ if ($Destroy -and !$ScaleDown){
         {
             RenameFileBackForDHCP
         }
+
+    if ($Workgroup)
+        {
+            RenameFileBackForWorkGroup
+        }       
 }
 
 if ($ScaleDown){
@@ -728,13 +830,18 @@ if ($ScaleDown){
 
     if ($ProxyPerHost)
         {
-            RenameFileForAntiAffinity
+            RenameFileForAntiAffinity 
         }
 
     if ($DHCP)
         {
             RenameFileForDHCP
         }
+
+    if ($Workgroup)
+        {
+            RenameFileForWorkGroup
+        }  
     
     Write-Host ""
     Write-Host ":: - Scaling Down Proxies from Backup & Replication Server Configuration - ::" -ForegroundColor Green -BackgroundColor Black
@@ -772,6 +879,11 @@ if ($ScaleDown){
         {
             RenameFileBackForDHCP
         }
+
+    if ($Workgroup)
+        {
+            RenameFileBackForWorkGroup
+        } 
 }
 
 Stop-Transcript

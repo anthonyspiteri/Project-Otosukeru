@@ -8,6 +8,8 @@
     "VBRDetails": {
             "Server":"TPM03-VBR01.AperatureLabs.biz",
             "Username":"APLABS\\service.veeam",
-            "Password":"password$12"
+            "Password":"password$12",
+            "Username2":"autodeploy",
+            "Password2":"Veeam1!"
         }
 }
