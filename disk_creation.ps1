@@ -13,5 +13,5 @@ Format-Volume -DriveLetter V -FileSystem ReFS -AllocationUnitSize 65536 -NewFile
 $disk = Get-Disk -Number 3
 Set-Disk -InputObject $disk -IsOffline $false
 Initialize-Disk -InputObject $disk
-New-Partition $disk.Number -UseMaximumSize -DriveLetter R
+New-Partition $disk.Number -UseMaximumSize -DriveLetter S
 Format-Volume -DriveLetter V -FileSystem ReFS -AllocationUnitSize 65536 -NewFileSystemLabel "REPO-02" -Confirm:$false
